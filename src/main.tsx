@@ -6,8 +6,12 @@ import { GoogleGenAI } from "@google/genai";
 
 // AI Logic
 const getApiKey = () => {
-  const envKey = process.env.GEMINI_API_KEY;
-  if (envKey && envKey !== "MY_GEMINI_API_KEY") return envKey;
+  try {
+    const envKey = process.env.GEMINI_API_KEY;
+    if (envKey && envKey !== "MY_GEMINI_API_KEY") return envKey;
+  } catch (e) {
+    // process might be missing in some environments
+  }
   return localStorage.getItem('CUSTOM_GEMINI_API_KEY') || "";
 };
 
