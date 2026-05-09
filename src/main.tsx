@@ -5,7 +5,11 @@ import { Sparkles, GraduationCap, ArrowRight, Loader2, BookOpen, UserCircle, Ref
 import { GoogleGenAI } from "@google/genai";
 
 // AI Logic
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+const getApiKey = () => {
+  const envKey = process.env.GEMINI_API_KEY;
+  if (envKey && envKey !== "MY_GEMINI_API_KEY") return envKey;
+  return localStorage.getItem('CUSTOM_GEMINI_API_KEY') || "";
+};
 
 const SYSTEM_PROMPT = `
 # 역할 (Role)
@@ -19,7 +23,6 @@ const SYSTEM_PROMPT = `
 # 🚫 3대 절대 제약 조건 (Crucial Constraints)
 1. 1차원적 비유 및 클리셰 절대 금지
    - 교과 개념을 진로에 억지로 빗대어 해석하지 마세요.
-   - 교과 지식이 해당 직업의 '실제 실무나 학술 연구'에서 물리적/제도적으로 어떻게 쓰이는지에만 집중하세요.
 2. 진로 계열별 맞춤 해결 강제
    - 진로 계열에 따라 결과물의 '형태'가 완벽히 달라야 합니다.
 3. 기계적인 고정 문장 틀(Template) 사용 금지
@@ -35,8 +38,11 @@ const SYSTEM_PROMPT = `
 (평가자를 사로잡을 핵심 어필 포인트를 추천해주세요.)
 `;
 
-async function getConsulting(subject: string, career: string) {
-  if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is missing");
+async function getConsulting(subject: string, career: string, customApiKey?: string) {
+  const apiKey = customApiKey || getApiKey();
+  if (!apiKey) throw new Error("API_KEY_MISSING");
+  
+  const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: `과목 및 주제: ${subject}\n희망 진로: ${career}`,
@@ -51,20 +57,38 @@ function App() {
   const [career, setCareer] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [showKeyInput, setShowKeyInput] = useState(!getApiKey());
+  const [tempApiKey, setTempApiKey] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!subject || !career) return;
+    
     setLoading(true);
     setResult(null);
     try {
       const response = await getConsulting(subject, career);
       setResult(response);
-    } catch (error) {
-      console.error(error);
-      alert('오류가 발생했습니다.');
+    } catch (error: any) {
+      if (error.message === "API_KEY_MISSING") {
+        setShowKeyInput(true);
+      } else {
+        console.error(error);
+        alert('오류가 발생했습니다. API 키를 확인해주세요.');
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (tempApiKey.startsWith('AIza')) {
+      localStorage.setItem('CUSTOM_GEMINI_API_KEY', tempApiKey);
+      setShowKeyInput(false);
+      alert('API 키가 저장되었습니다.');
+    } else {
+      alert('올바른 Gemini API 키를 입력해주세요.');
     }
   };
 
@@ -82,16 +106,54 @@ function App() {
             </div>
           </div>
           <div className="hidden md:flex gap-6 italic text-xs font-bold text-slate-400">
-            AI CONSULTANT ONLINE · GEMINI 3.0 FLASH
+            {getApiKey() ? 'AI CONSULTANT ONLINE · GEMINI 3.0 FLASH' : 'API KEY REQUIRED'}
           </div>
         </header>
+
+        {showKeyInput && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bento-card-indigo p-8 mb-6 border-2 border-indigo-400">
+            <h3 className="text-xl font-bold mb-2">🔑 Gemini API 키가 필요합니다</h3>
+            <p className="text-indigo-200 text-sm mb-6">GitHub 등 외부 환경에서 실행하려면 Gemini API 키가 필요합니다. 구글 AI 스튜디오에서 키를 발급받아 입력해주세요.</p>
+            <form onSubmit={handleSaveKey} className="flex flex-col sm:flex-row gap-3">
+              <input 
+                type="password" 
+                placeholder="AIza..." 
+                value={tempApiKey}
+                onChange={(e) => setTempApiKey(e.target.value)}
+                className="input-field bg-white/10 text-white placeholder:text-white/30 border-white/20 flex-1"
+                required
+              />
+              <button type="submit" className="px-8 py-3 bg-white text-indigo-900 font-bold rounded-xl hover:bg-indigo-50 transition-colors">키 저장하기</button>
+            </form>
+            <p className="mt-4 text-[10px] text-indigo-300">입력하신 키는 브라우저의 localStorage에만 안전하게 저장됩니다.</p>
+          </motion.div>
+        )}
 
         {!result ? (
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
             {/* Left: Input Section */}
             <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="md:col-span-8 bento-card p-8 flex flex-col justify-between">
               <div>
-                <h2 className="text-3xl font-bold text-slate-900 mb-2">수행평가에 <span className="text-indigo-600 underline underline-offset-8 decoration-indigo-200">진로</span>를 더하다.</h2>
+                <div className="flex justify-between items-start mb-2">
+                  <h2 className="text-3xl font-bold text-slate-900">수행평가에 <span className="text-indigo-600 underline underline-offset-8 decoration-indigo-200">진로</span>를 더하다.</h2>
+                  {!getApiKey() ? (
+                    <span className="px-2 py-1 bg-red-50 text-red-600 text-[10px] font-bold rounded animate-pulse">API KEY NEEDED</span>
+                  ) : (
+                    localStorage.getItem('CUSTOM_GEMINI_API_KEY') && (
+                      <button 
+                        onClick={() => {
+                          if(confirm('저장된 API 키를 삭제할까요?')) {
+                            localStorage.removeItem('CUSTOM_GEMINI_API_KEY');
+                            window.location.reload();
+                          }
+                        }}
+                        className="px-2 py-1 bg-slate-100 text-slate-500 hover:text-red-600 text-[9px] font-bold rounded transition-colors"
+                      >
+                        API KEY RESET
+                      </button>
+                    )
+                  )}
+                </div>
                 <p className="text-slate-500 mb-8 leading-relaxed">평범한 주제를 나만의 특별한 스토리로 바꾸는 학술적 설계를 시작하세요.</p>
                 
                 <form onSubmit={handleSubmit} className="space-y-6">

@@ -3,7 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>진로 연계 수행평가 컨설턴트</title>
+    <meta name="description" content="AI 진로 연계 수행평가 컨설턴트 - 고등학생의 수행평가를 전공 적합성에 맞게 설계합니다." />
+    <meta name="keywords" content="수행평가, 진로, 세특, AI 컨설팅, 고등학생, 학생부종합전형" />
+    <link rel="icon" type="image/svg+xml" href="https://api.iconify.design/lucide:graduation-cap.svg" />
+    <title>LinkPath Professional | AI 진로 연계 수행평가 컨설턴트</title>
+    <!-- Google Fonts & Tailwind CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style type="text/tailwindcss">
       @import "tailwindcss";
@@ -15,12 +19,13 @@
 
       @layer base {
         body {
-          @apply bg-slate-50 text-slate-900 antialiased;
+          @apply bg-slate-50 text-slate-900 antialiased overflow-x-hidden;
         }
       }
 
+      /* Bento Grid Custom Styles */
       .bento-card {
-        @apply bg-white rounded-3xl p-6 border border-slate-200 shadow-sm transition-all duration-300;
+        @apply bg-white rounded-3xl p-6 border border-slate-200 shadow-sm transition-all duration-300 hover:shadow-md hover:border-slate-300;
       }
 
       .bento-card-dark {
