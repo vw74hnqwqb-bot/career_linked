@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI 진로 연계 수행평가 컨설턴트 - 고등학생의 수행평가를 전공 적합성에 맞게 설계합니다.">
+    <title>CareerPath Pro | AI 진로 연계 수행평가 컨설턴트</title>
+    
+    <!-- Libraries (CDN) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/framer-motion@11.11.17/dist/framer-motion.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
+        body { font-family: 'Pretendard', sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // Framer Motion Global usually attaches to window.Motion
+        const motion = window.Motion?.motion || { 
+            div: (props) => <div {...props}>{props.children}</div>,
+            section: (props) => <section {...props}>{props.children}</section>,
+            header: (props) => <header {...props}>{props.children}</header>,
+            h1: (props) => <h1 {...props}>{props.children}</h1>,
+            h2: (props) => <h1 {...props}>{props.children}</h1>,
+            h3: (props) => <h1 {...props}>{props.children}</h1>,
+            p: (props) => <p {...props}>{props.children}</p>,
+            button: (props) => <button {...props}>{props.children}</button>,
+            form: (props) => <form {...props}>{props.children}</form>,
+            textarea: (props) => <textarea {...props}>{props.children}</textarea>,
+            input: (props) => <input {...props} />,
+            span: (props) => <span {...props}>{props.children}</span>,
+            ul: (props) => <ul {...props}>{props.children}</ul>,
+            li: (props) => <li {...props}>{props.children}</li>,
+            footer: (props) => <footer {...props}>{props.children}</footer>
+        };
+        const AnimatePresence = window.Motion?.AnimatePresence || (({children}) => <>{children}</>);
+
+        // Lucide Icon Helper
+        const Icon = ({ name, size = 20, className = "" }) => {
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [name]);
+            return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
+        };
+
+        const SYSTEM_PROMPT = `고등학생 진로 연계 수행평가 컨설턴트입니다. 융합 공식: [교과 개념] x [진로 도구] = [실천적 산출물]. 1차원적 비유 금지. 실무/학술적 쓰임에 집중. 맞춤형 탐구 전략과 멘토의 실전 팁만 출력하세요.`;
+
+        async function fetchConsulting(subject, career, apiKey) {
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: `시스템: ${SYSTEM_PROMPT}\n주제: ${subject}\n진로: ${career}` }] }] })
+            });
+            const data = await response.json();
+            if (data.error) throw new Error(data.error.message);
+            return data.candidates[0].content.parts[0].text;
+        }
+
+        function App() {
+            const [subject, setSubject] = useState('');
+            const [career, setCareer] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [result, setResult] = useState(null);
+            const [apiKey, setApiKey] = useState(localStorage.getItem('GS_KEY') || '');
+            const [showKey, setShowKey] = useState(!apiKey);
+
+            const handleAnalyze = async (e) => {
+                e.preventDefault();
+                if (!apiKey) { setShowKey(true); return; }
+                setLoading(true);
+                try {
+                    const res = await fetchConsulting(subject, career, apiKey);
+                    setResult(res);
+                } catch (err) { alert('오류: ' + err.message); if (err.message.includes('API_KEY')) setShowKey(true); }
+                finally { setLoading(false); }
+            };
+
+            return (
+                <div className="min-h-screen p-4 md:p-8">
+                    <div className="max-w-6xl mx-auto space-y-6">
+                        <header className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg"><Icon name="graduation-cap" size={28} /></div>
+                                <div><h1 className="text-xl font-bold text-slate-900">CareerPath Pro</h1><p className="text-[10px] text-indigo-600 font-bold uppercase tracking-widest">Standalone Version</p></div>
+                            </div>
+                            <button onClick={() => setShowKey(true)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors"><Icon name="key" size={18} className="text-slate-400" /></button>
+                        </header>
+
+                        {showKey && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                                <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full">
+                                    <h3 className="text-xl font-bold mb-2">🔑 Gemini API 키 입력</h3>
+                                    <input type="password" id="k-in" placeholder="AIza..." className="w-full h-12 px-4 border border-slate-200 rounded-xl mb-4" />
+                                    <button onClick={() => { const k = document.getElementById('k-in').value; localStorage.setItem('GS_KEY', k); setApiKey(k); setShowKey(false); }} className="w-full h-12 bg-indigo-600 text-white font-bold rounded-xl">저장 후 시작</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {!result ? (
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                                <div className="md:col-span-8 bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
+                                    <h2 className="text-3xl font-bold text-slate-900 mb-2">수행평가에 <span className="text-indigo-600 underline underline-offset-8 decoration-indigo-200">진로</span>를 더하다.</h2>
+                                    <p className="text-slate-400 text-sm mb-8">구체적으로 적을수록 AI의 제안이 정교해집니다.</p>
+                                    <form onSubmit={handleAnalyze} className="space-y-6">
+                                        <textarea value={subject} onChange={e => setSubject(e.target.value)} placeholder="과목과 탐구 주제를 상세히 입력하세요..." className="w-full h-32 p-4 bg-slate-50 border border-slate-200 rounded-2xl resize-none" required />
+                                        <input type="text" value={career} onChange={e => setCareer(e.target.value)} placeholder="희망 진로를 입력하세요..." className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl" required />
+                                        <button disabled={loading} className="w-full h-14 bg-indigo-600 text-white font-bold rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all">
+                                            {loading ? <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" /> : <>탐구 전략 설계하기 <Icon name="arrow-right" /></>}
+                                        </button>
+                                    </form>
+                                </div>
+                                <div className="md:col-span-4 space-y-6">
+                                    <div className="bg-indigo-900 rounded-3xl p-6 text-white text-center shadow-lg"><p className="text-xl font-bold">교과원리 × 전공도구<br/>= 실천적 산출물</p></div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-6 pb-20">
+                                <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+                                    <div className="bg-indigo-600 p-6 text-white font-bold flex items-center gap-3"><Icon name="sparkles" /> 🎯 맞춤형 탐구 전략</div>
+                                    <div className="p-8 text-slate-700 leading-relaxed whitespace-pre-wrap">{result.split('[💡 멘토의 실전 팁]')[0].replace('[🎯 맞춤형 탐구 전략]', '').trim()}</div>
+                                </div>
+                                <div className="bg-slate-900 rounded-3xl p-8 text-white flex flex-col md:flex-row gap-6 items-center shadow-xl">
+                                    <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-3xl">💡</div>
+                                    <div className="flex-1"><h4 className="text-xl font-bold mb-2 text-indigo-400">멘토의 실전 팁</h4><p className="text-slate-400">{result.split('[💡 멘토의 실전 팁]')[1]?.trim() || "더 깊이 있는 탐구를 시작해 보세요."}</p></div>
+                                    <button onClick={() => setResult(null)} className="px-6 h-12 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold flex items-center gap-2"><Icon name="refresh-ccw" size={16} /> 다시 하기</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
