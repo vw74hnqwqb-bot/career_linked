@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>진로 연계 수행평가 컨설턴트</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+      @import "tailwindcss";
+      @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
+      
+      @theme {
+        --font-sans: "Pretendard", ui-sans-serif, system-ui, sans-serif;
+      }
+
+      @layer base {
+        body {
+          @apply bg-slate-50 text-slate-900 antialiased;
+        }
+      }
+
+      .bento-card {
+        @apply bg-white rounded-3xl p-6 border border-slate-200 shadow-sm transition-all duration-300;
+      }
+
+      .bento-card-dark {
+        @apply bg-slate-900 rounded-3xl p-6 text-white shadow-lg transition-all duration-300;
+      }
+
+      .bento-card-indigo {
+        @apply bg-indigo-900 rounded-3xl p-6 text-white overflow-hidden relative shadow-lg transition-all duration-300;
+      }
+
+      .input-label {
+        @apply text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1 block;
+      }
+
+      .input-field {
+        @apply w-full h-12 px-5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
