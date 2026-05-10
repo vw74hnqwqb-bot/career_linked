@@ -1,13 +1,345 @@
 <!DOCTYPE html>
 <html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="AI 진로 연계 수행평가 컨설턴트 - 고등학생의 수행평가를 전공 적합성에 맞게 설계합니다." />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI 진로 연계 수행평가 컨설턴트 - 고등학생의 수행평가를 전공 적합성에 맞게 설계합니다.">
     <title>CareerPath Pro | AI 진로 연계 수행평가 컨설턴트</title>
-  </head>
-  <body>
+    
+    <!-- Libraries (CDN) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/framer-motion@11.11.17/dist/framer-motion.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
+        body { 
+            font-family: 'Pretendard', ui-sans-serif, system-ui, sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+            -webkit-font-smoothing: antialiased;
+        }
+        .bento-shadow { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05); }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        
+        // Framer Motion Global Mapping
+        const motion = window.Motion?.motion || { 
+            div: (props) => <div {...props}>{props.children}</div>,
+            section: (props) => <section {...props}>{props.children}</section>,
+            h2: (props) => <h2 {...props}>{props.children}</h2>,
+            p: (props) => <p {...props}>{props.children}</p>,
+            footer: (props) => <footer {...props}>{props.children}</footer>,
+            h1: (props) => <h1 {...props}>{props.children}</h1>,
+            form: (props) => <form {...props}>{props.children}</form>,
+            button: (props) => <button {...props}>{props.children}</button>,
+            span: (props) => <span {...props}>{props.children}</span>,
+            ul: (props) => <ul {...props}>{props.children}</ul>,
+            li: (props) => <li {...props}>{props.children}</li>,
+            textarea: (props) => <textarea {...props}>{props.children}</textarea>,
+            h3: (props) => <h3 {...props}>{props.children}</h3>,
+            h4: (props) => <h4 {...props}>{props.children}</h4>,
+            header: (props) => <header {...props}>{props.children}</header>
+        };
+        const AnimatePresence = window.Motion?.AnimatePresence || (({children}) => <>{children}</>);
+
+        // Lucide Icon Helper
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const iconRef = useRef(null);
+            useEffect(() => { 
+                if (window.lucide) {
+                    lucide.createIcons(); 
+                }
+            }, [name]);
+            return <i data-lucide={name} style={{ width: size, height: size }} className={className} ref={iconRef}></i>;
+        };
+
+        const SYSTEM_PROMPT = `
+# 역할 (Role)
+고등학생 진로 연계 수행평가 컨설턴트입니다. 
+융합 공식: [교과 개념] x [진로 도구] = [실천적 산출물]
+
+# 🚫 절대 제약 조건
+1. 1차원적 비유 금지. 실무/학술적 쓰임에 집중. 
+2. 진로 계열에 따라 결과물의 '형태'가 완벽히 달라야 합니다.
+
+# 출력 구조
+[🎯 맞춤형 탐구 전략]
+(탐구 주제, 핵심 도구, 예상 산출물 형태를 상세히 제안하세요.)
+
+[💡 멘토의 실전 팁]
+(심화 탐구 방향과 생기부 기록 포인트를 제언하세요.)
+`;
+
+        async function fetchConsulting(subject, career, apiKey) {
+            // Using 1.5-flash for maximum stability in standalone
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    contents: [{ parts: [{ text: `시스템 지침: ${SYSTEM_PROMPT}\n입력주제: ${subject}\n진로: ${career}` }] }] 
+                })
+            });
+            const data = await response.json();
+            if (data.error) throw new Error(data.error.message);
+            return data.candidates[0].content.parts[0].text;
+        }
+
+        function App() {
+            const [subject, setSubject] = useState('');
+            const [career, setCareer] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [result, setResult] = useState(null);
+            const [apiKey, setApiKey] = useState(localStorage.getItem('GS_KEY') || '');
+            const [showKeyModal, setShowKeyModal] = useState(!apiKey);
+            const [tempKey, setTempKey] = useState('');
+
+            const handleAnalyze = async (e) => {
+                e.preventDefault();
+                if (!apiKey) { setShowKeyModal(true); return; }
+                setLoading(true);
+                try {
+                    const res = await fetchConsulting(subject, career, apiKey);
+                    setResult(res);
+                } catch (err) { 
+                    console.error(err);
+                    alert('오류: ' + (err.message || 'API 호출 중 문제가 발생했습니다.')); 
+                    if (err.message.includes('API_KEY') || err.message.includes('403')) setShowKeyModal(true); 
+                } finally { setLoading(false); }
+            };
+
+            const saveKey = (key) => {
+                if (!key.startsWith('AIza')) {
+                    alert('올바른 Gemini API 키 형식이 아닙니다.');
+                    return;
+                }
+                localStorage.setItem('GS_KEY', key);
+                setApiKey(key);
+                setShowKeyModal(false);
+            };
+
+            return (
+                <div className="min-h-screen p-4 md:p-8 flex flex-col items-center">
+                    <div className="w-full max-w-6xl space-y-6">
+                        {/* Header */}
+                        <header className="flex justify-between items-center bg-white p-6 rounded-3xl bento-shadow border border-slate-200">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+                                    <Icon name="graduation-cap" size={28} />
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold text-slate-900 tracking-tight">CareerPath Pro</h1>
+                                    <p className="text-[10px] text-indigo-600 font-bold uppercase tracking-widest leading-none mt-1">AI Academic Assistant</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setShowKeyModal(true)} 
+                                className="p-3 hover:bg-slate-50 rounded-2xl transition-all flex items-center gap-2 border border-transparent hover:border-slate-100"
+                            >
+                                <Icon name="key" size={18} className={apiKey ? "text-indigo-600" : "text-slate-400"} />
+                                <span className="text-xs font-bold text-slate-500 hidden sm:inline">API Settings</span>
+                            </button>
+                        </header>
+
+                        {/* API Key Modal */}
+                        {showKeyModal && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+                                <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full border border-slate-100">
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div>
+                                            <h3 className="text-xl font-bold mb-1 tracking-tight">🔑 Gemini API 키 입력</h3>
+                                            <p className="text-xs text-slate-500 font-medium leading-relaxed">구글 AI 스튜디오에서 발급받은 키를 입력하세요. 입력하신 키는 브라우저(LocalStorage)에만 안전하게 저장됩니다.</p>
+                                        </div>
+                                    </div>
+                                    <input 
+                                        type="password" 
+                                        placeholder="AIza..." 
+                                        value={tempKey}
+                                        onChange={(e) => setTempKey(e.target.value)}
+                                        className="w-full h-12 px-5 bg-slate-50 border border-slate-200 rounded-xl mb-4 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none font-mono text-sm" 
+                                    />
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={() => saveKey(tempKey)} 
+                                            className="flex-1 h-12 bg-indigo-600 hover:bg-slate-900 text-white font-bold rounded-xl shadow-lg shadow-indigo-100 transition-all"
+                                        >
+                                            저장 및 시작하기
+                                        </button>
+                                        {apiKey && (
+                                            <button 
+                                                onClick={() => setShowKeyModal(false)} 
+                                                className="px-6 h-12 bg-slate-100 text-slate-500 rounded-xl font-bold hover:bg-slate-200 transition-all"
+                                            >
+                                                닫기
+                                            </button>
+                                        )}
+                                    </div>
+                                    <p className="mt-4 text-[10px] text-center text-slate-400 font-medium leading-relaxed">
+                                        키가 없으신가요? <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-indigo-600 underline">여기서 무료로 발급받으세요.</a>
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {!result ? (
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                                <div className="md:col-span-8 bg-white rounded-3xl p-8 border border-slate-200 bento-shadow flex flex-col justify-between overflow-hidden relative group">
+                                    <div className="relative z-10">
+                                        <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3 leading-tight tracking-tight">
+                                            수행평가에 <span className="text-indigo-600 underline underline-offset-8 decoration-indigo-100/50">진로</span>를 더하다.
+                                        </h2>
+                                        <p className="text-slate-400 text-sm mb-10 leading-relaxed max-w-lg">단순한 과제를 넘어서, 나만의 전공 적합성을 증명할 수 있는 고차원적 탐구 보고서로 리패키징하세요.</p>
+                                        
+                                        <form onSubmit={handleAnalyze} className="space-y-6">
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between items-center">
+                                                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Subject & Topic</label>
+                                                    <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-bold">Concept Focus</span>
+                                                </div>
+                                                <textarea 
+                                                    value={subject} 
+                                                    onChange={e => setSubject(e.target.value)} 
+                                                    placeholder="예: 생명과학2 - 효소의 활성과 온도 실험을 통해 인체 내부 피드백 기전 탐구" 
+                                                    className="w-full h-40 p-5 bg-slate-50 border border-slate-200 rounded-3xl resize-none shadow-inner focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all outline-none font-medium text-sm leading-relaxed" 
+                                                    required 
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Target Career</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={career} 
+                                                    onChange={e => setCareer(e.target.value)} 
+                                                    placeholder="희망 진로를 입력하세요 (예: 사이버 보안 전문가)" 
+                                                    className="w-full h-14 px-5 bg-slate-50 border border-slate-200 rounded-2xl shadow-inner focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all outline-none font-medium text-sm" 
+                                                    required 
+                                                />
+                                            </div>
+                                            <button 
+                                                disabled={loading} 
+                                                className="w-full h-16 bg-indigo-600 hover:bg-slate-900 disabled:bg-slate-200 text-white font-bold rounded-3xl shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 transition-all transform active:scale-95"
+                                            >
+                                                {loading ? (
+                                                    <div className="animate-spin h-6 w-6 border-3 border-white border-t-transparent rounded-full" />
+                                                ) : (
+                                                    <>분석 및 탐구 전략 설계하기 <Icon name="arrow-right" /></>
+                                                )}
+                                            </button>
+                                        </form>
+                                    </div>
+                                    <div className="absolute top-0 right-0 p-12 opacity-[0.03] scale-150 rotate-12 -z-0">
+                                        <Icon name="sparkles" size={200} />
+                                    </div>
+                                </div>
+
+                                <div className="md:col-span-4 space-y-6">
+                                    <div className="bg-slate-900 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden group">
+                                        <div className="absolute -right-6 -bottom-6 opacity-10 group-hover:scale-110 transition-all duration-700">
+                                            <Icon name="sparkles" size={150} />
+                                        </div>
+                                        <h3 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-4">The Formula</h3>
+                                        <p className="text-2xl font-bold leading-tight relative z-10 tracking-tight">교과원리 × 전공도구<br/>= 실천적 산출물</p>
+                                        <p className="text-slate-500 text-[10px] mt-4 font-medium italic">당신의 진부한 생기부를 바꿀 마법의 공식입니다.</p>
+                                    </div>
+
+                                    <div className="bg-white rounded-3xl p-7 border border-slate-200 bento-shadow">
+                                        <h3 className="text-xs font-bold uppercase tracking-widest text-slate-900 mb-5 flex items-center gap-2">
+                                            <div className="w-2 h-2 bg-indigo-500 rounded-full"></div> 
+                                            How to Build
+                                        </h3>
+                                        <ul className="text-xs space-y-5 text-slate-600 font-medium">
+                                            {[
+                                                "제안된 탐구 키워드로 논문을 검색하세요.",
+                                                "산출물 형태를 실제 수행 결과로 만듭니다.",
+                                                "탐구 동기와 변화를 세특에 기록해 보세요."
+                                            ].map((s, i) => (
+                                                <li key={i} className="flex gap-4 items-start">
+                                                    <span className="shrink-0 w-6 h-6 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center font-bold text-[10px] border border-indigo-100/50">{i+1}</span>
+                                                    <span className="leading-normal">{s}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+
+                                    <div className="bg-indigo-50/50 rounded-3xl p-6 border border-indigo-100/50">
+                                        <p className="text-[11px] text-indigo-800 leading-relaxed italic font-medium">
+                                            "결과물 자체보다 <strong>'어떤 의도를 가지고 어떤 과정을 거쳤는지'</strong>를 보여주는 것이 훨씬 중요합니다."
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-6 pb-20">
+                                <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden bento-shadow">
+                                    <div className="bg-indigo-600 p-8 text-white font-bold flex justify-between items-center relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 p-10 opacity-20 rotate-12"><Icon name="sparkles" size={100} /></div>
+                                        <div className="flex items-center gap-4 relative z-10 text-xl tracking-tight">
+                                            <Icon name="sparkles" size={24} /> 🎯 나만의 맞춤형 탐구 전략
+                                        </div>
+                                        <span className="text-[10px] bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full font-bold uppercase tracking-widest relative z-10 border border-white/10">Gemini High-Speed</span>
+                                    </div>
+                                    <div className="p-8 md:p-10 text-slate-700 leading-relaxed whitespace-pre-wrap font-medium text-[16px] bg-white">
+                                        {result.split('[💡 멘토의 실전 팁]')[0].replace('[🎯 맞춤형 탐구 전략]', '').trim()}
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-900 rounded-3xl p-8 md:p-10 text-white flex flex-col md:flex-row gap-8 items-center shadow-2xl relative border border-slate-800">
+                                    <div className="w-20 h-20 bg-indigo-500 rounded-3xl flex items-center justify-center text-4xl shadow-xl shadow-indigo-500/20 shrink-0 rotate-3 transition-transform hover:rotate-0">
+                                        💡
+                                    </div>
+                                    <div className="flex-1 text-center md:text-left">
+                                        <h4 className="text-2xl font-bold mb-3 text-indigo-400 tracking-tight flex items-center gap-2 justify-center md:justify-start">
+                                            멘토의 실전 팁
+                                        </h4>
+                                        <p className="text-slate-300 text-[15px] leading-relaxed font-medium">
+                                            {result.split('[💡 멘토의 실전 팁]')[1]?.trim() || "더 깊이 있는 탐구를 위해 RISS, DBpia 등에서 선행 연구 문헌 조사를 병행하는 것을 추천합니다."}
+                                        </p>
+                                    </div>
+                                    <button 
+                                        onClick={() => setResult(null)} 
+                                        className="shrink-0 px-8 h-14 bg-white/5 hover:bg-white/10 rounded-2xl text-sm font-bold flex items-center gap-3 transition-all border border-white/10 group active:scale-95"
+                                    >
+                                        <Icon name="refresh-ccw" size={16} className="group-hover:rotate-180 transition-transform duration-500" /> 다시 설계하기
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <footer className="pt-20 pb-12 border-t border-slate-200/60 flex flex-col sm:flex-row justify-between items-center gap-6 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                            <div className="flex items-center gap-3">
+                                <span className="p-1.5 bg-slate-100 rounded-lg">© 2026 Academic Life Lab.</span>
+                            </div>
+                            <div className="flex items-center gap-6">
+                                <span className="flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div> 
+                                    API Engine Connected
+                                </span>
+                                <div className="w-1 h-1 bg-slate-300 rounded-full"></div>
+                                <span>Powered by Google AI Studio</span>
+                            </div>
+                        </footer>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
 </html>

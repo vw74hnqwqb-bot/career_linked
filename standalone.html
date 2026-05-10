@@ -29,13 +29,25 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
         
         // Framer Motion Global Mapping
         const motion = window.Motion?.motion || { 
-            div: "div", section: "section", h2: "h2", p: "p", footer: "footer", 
-            h1: "h1", form: "form", button: "button", span: "span", ul: "ul", li: "li", 
-            textarea: "textarea", h3: "h3", h4: "h4", header: "header"
+            div: (props) => <div {...props}>{props.children}</div>,
+            section: (props) => <section {...props}>{props.children}</section>,
+            h2: (props) => <h2 {...props}>{props.children}</h2>,
+            p: (props) => <p {...props}>{props.children}</p>,
+            footer: (props) => <footer {...props}>{props.children}</footer>,
+            h1: (props) => <h1 {...props}>{props.children}</h1>,
+            form: (props) => <form {...props}>{props.children}</form>,
+            button: (props) => <button {...props}>{props.children}</button>,
+            span: (props) => <span {...props}>{props.children}</span>,
+            ul: (props) => <ul {...props}>{props.children}</ul>,
+            li: (props) => <li {...props}>{props.children}</li>,
+            textarea: (props) => <textarea {...props}>{props.children}</textarea>,
+            h3: (props) => <h3 {...props}>{props.children}</h3>,
+            h4: (props) => <h4 {...props}>{props.children}</h4>,
+            header: (props) => <header {...props}>{props.children}</header>
         };
         const AnimatePresence = window.Motion?.AnimatePresence || (({children}) => <>{children}</>);
 
@@ -45,10 +57,25 @@
             return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
         };
 
-        const SYSTEM_PROMPT = `고등학생 진로 연계 수행평가 컨설턴트입니다. 융합 공식: [교과 개념] x [진로 도구] = [실천적 산출물]. 1차원적 비유 금지. 실무/학술적 쓰임에 집중. 맞춤형 탐구 전략과 멘토의 실전 팁만 출력하세요.`;
+        const SYSTEM_PROMPT = `
+# 역할 (Role)
+고등학생 진로 연계 수행평가 컨설턴트입니다. 
+융합 공식: [교과 개념] x [진로 도구] = [실천적 산출물]
+
+# 🚫 절대 제약 조건
+1. 1차원적 비유 금지. 실무/학술적 쓰임에 집중. 
+2. 진로 계열에 따라 결과물의 '형태'가 완벽히 달라야 합니다.
+
+# 출력 구조
+[🎯 맞춤형 탐구 전략]
+(탐구 주제, 핵심 도구, 예상 산출물 형태를 상세히 제안하세요.)
+
+[💡 멘토의 실전 팁]
+(심화 탐구 방향과 생기부 기록 포인트를 제언하세요.)
+`;
 
         async function fetchConsulting(subject, career, apiKey) {
-            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -66,6 +93,7 @@
             const [result, setResult] = useState(null);
             const [apiKey, setApiKey] = useState(localStorage.getItem('GS_KEY') || '');
             const [showKey, setShowKey] = useState(!apiKey);
+            const [tempKey, setTempKey] = useState('');
 
             const handleAnalyze = async (e) => {
                 e.preventDefault();
@@ -76,6 +104,13 @@
                     setResult(res);
                 } catch (err) { alert('오류: ' + err.message); if (err.message.includes('API_KEY')) setShowKey(true); }
                 finally { setLoading(false); }
+            };
+
+            const saveKey = (key) => {
+                if (!key.startsWith('AIza')) { alert('Invalid Key'); return; }
+                localStorage.setItem('GS_KEY', key);
+                setApiKey(key);
+                setShowKey(false);
             };
 
             return (
@@ -93,9 +128,14 @@
                             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
                                 <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full">
                                     <h3 className="text-xl font-bold mb-2">🔑 API Key Setting</h3>
-                                    <p className="text-xs text-slate-500 mb-6">Gemini API 키가 필요합니다. 키는 브라우저에만 저장됩니다.</p>
-                                    <input type="password" id="k-in" placeholder="AIza..." className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl mb-4 focus:ring-2 focus:ring-indigo-500/20" />
-                                    <button onClick={() => { const k = document.getElementById('k-in').value; if(k.startsWith('AIza')){localStorage.setItem('GS_KEY', k); setApiKey(k); setShowKey(false);} else alert('Invalid Key'); }} className="w-full h-12 bg-indigo-600 text-white font-bold rounded-xl shadow-lg">저장 및 시작</button>
+                                    <input 
+                                        type="password" 
+                                        placeholder="AIza..." 
+                                        value={tempKey}
+                                        onChange={(e) => setTempKey(e.target.value)}
+                                        className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl mb-4 focus:ring-2 focus:ring-indigo-500/20" 
+                                    />
+                                    <button onClick={() => saveKey(tempKey)} className="w-full h-12 bg-indigo-600 text-white font-bold rounded-xl shadow-lg">저장 및 시작</button>
                                 </div>
                             </div>
                         )}
@@ -140,9 +180,9 @@
                         ) : (
                             <div className="space-y-6 pb-20">
                                 <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden bento-shadow">
-                                    <div className="bg-indigo-600 p-8 text-white font-bold flex justify-between items-center">
+                                    <div className="bg-indigo-600 p-8 text-white font-bold flex justify-between items-center text-xl">
                                         <div className="flex items-center gap-3"><Icon name="sparkles" /> 🎯 나만의 탐구 전략</div>
-                                        <span className="text-[10px] bg-white/20 px-3 py-1 rounded-full">Gemini 3 Flash</span>
+                                        <span className="text-[10px] bg-white/20 px-3 py-1 rounded-full">Gemini 1.5</span>
                                     </div>
                                     <div className="p-8 text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">{result.split('[💡 멘토의 실전 팁]')[0].replace('[🎯 맞춤형 탐구 전략]', '').trim()}</div>
                                 </div>
