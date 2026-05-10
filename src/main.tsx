@@ -16,11 +16,11 @@ import './index.css';
 
 // --- API Key Management (Protection) ---
 const getActiveApiKey = () => {
-  // 1. Try environment variable (provided by AI Studio)
+  // 1. Try environment variable (provided by AI Studio or baked into Vite build)
   const envKey = process.env.GEMINI_API_KEY;
-  if (envKey && envKey !== "MY_GEMINI_API_KEY") return envKey;
+  if (envKey && envKey !== "MY_GEMINI_API_KEY" && envKey !== "") return envKey;
   
-  // 2. Try localStorage (for standalone/GitHub use)
+  // 2. Try localStorage (for standalone/manual use)
   return localStorage.getItem('GS_KEY') || "";
 };
 
@@ -325,7 +325,7 @@ function App() {
                   <h3 className="text-xl font-bold flex items-center gap-3 relative z-10">
                     <Sparkles size={24} /> 🎯 나만의 탐구 전략
                   </h3>
-                  <span className="text-[10px] bg-white/20 backdrop-blur px-3 py-1.5 rounded-full font-bold uppercase tracking-widest relative z-10">Gemini 3 Flash</span>
+                  <span className="text-[10px] bg-white/20 backdrop-blur px-3 py-1.5 rounded-full font-bold uppercase tracking-widest relative z-10">Gemini 3 Flash Preview</span>
                 </div>
                 <div className="p-8 text-slate-700 leading-relaxed font-medium text-[16px] whitespace-pre-wrap">
                   {result.split('[💡 멘토의 실전 팁]')[0].replace('[🎯 맞춤형 탐구 전략]', '').trim()}
