@@ -18,7 +18,7 @@ import './index.css';
 const getActiveApiKey = () => {
   try {
     // 1. Try environment variable (provided by AI Studio or baked into Vite build)
-    const envKey = typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : undefined;
+    const envKey = process.env.GEMINI_API_KEY;
     if (envKey && envKey !== "MY_GEMINI_API_KEY" && envKey !== "") return envKey;
   } catch (e) {
     console.warn("Environment variable access failed", e);
