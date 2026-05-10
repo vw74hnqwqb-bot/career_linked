@@ -16,9 +16,13 @@ import './index.css';
 
 // --- API Key Management (Protection) ---
 const getActiveApiKey = () => {
-  // 1. Try environment variable (provided by AI Studio or baked into Vite build)
-  const envKey = process.env.GEMINI_API_KEY;
-  if (envKey && envKey !== "MY_GEMINI_API_KEY" && envKey !== "") return envKey;
+  try {
+    // 1. Try environment variable (provided by AI Studio or baked into Vite build)
+    const envKey = typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : undefined;
+    if (envKey && envKey !== "MY_GEMINI_API_KEY" && envKey !== "") return envKey;
+  } catch (e) {
+    console.warn("Environment variable access failed", e);
+  }
   
   // 2. Try localStorage (for standalone/manual use)
   return localStorage.getItem('GS_KEY') || "";
@@ -48,7 +52,7 @@ async function fetchConsulting(subject: string, career: string, customKey?: stri
 
   const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview", 
+    model: "gemini-2.0-flash", 
     contents: `시스템 지침: ${SYSTEM_PROMPT}\n입력주제: ${subject}\n진로: ${career}`,
   });
 
@@ -325,7 +329,7 @@ function App() {
                   <h3 className="text-xl font-bold flex items-center gap-3 relative z-10">
                     <Sparkles size={24} /> 🎯 나만의 탐구 전략
                   </h3>
-                  <span className="text-[10px] bg-white/20 backdrop-blur px-3 py-1.5 rounded-full font-bold uppercase tracking-widest relative z-10">Gemini 3 Flash Preview</span>
+                  <span className="text-[10px] bg-white/20 backdrop-blur px-3 py-1.5 rounded-full font-bold uppercase tracking-widest relative z-10">Gemini 2.0 Flash</span>
                 </div>
                 <div className="p-8 text-slate-700 leading-relaxed font-medium text-[16px] whitespace-pre-wrap">
                   {result.split('[💡 멘토의 실전 팁]')[0].replace('[🎯 맞춤형 탐구 전략]', '').trim()}

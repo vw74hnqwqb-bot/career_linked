@@ -75,7 +75,7 @@
 `;
 
         async function fetchConsulting(subject, career, apiKey) {
-            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -182,7 +182,7 @@
                                 <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden bento-shadow">
                                     <div className="bg-indigo-600 p-8 text-white font-bold flex justify-between items-center text-xl">
                                         <div className="flex items-center gap-3"><Icon name="sparkles" /> 🎯 나만의 탐구 전략</div>
-                                        <span className="text-[10px] bg-white/20 px-3 py-1 rounded-full">Gemini 3 Flash Preview</span>
+                                        <span className="text-[10px] bg-white/20 px-3 py-1 rounded-full">Gemini 2.0 Flash</span>
                                     </div>
                                     <div className="p-8 text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">{result.split('[💡 멘토의 실전 팁]')[0].replace('[🎯 맞춤형 탐구 전략]', '').trim()}</div>
                                 </div>
