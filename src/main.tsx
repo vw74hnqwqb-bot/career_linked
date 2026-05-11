@@ -52,7 +52,7 @@ async function fetchConsulting(subject: string, career: string, customKey?: stri
 
   const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash", 
+    model: "gemini-2.0-flash", 
     contents: `시스템 지침: ${SYSTEM_PROMPT}\n입력주제: ${subject}\n진로: ${career}`,
   });
 
@@ -95,11 +95,15 @@ function App() {
     } catch (err: any) {
       console.error("Gemini Error:", err);
       const msg = err.message || '';
+      const fullError = typeof err === 'object' ? JSON.stringify(err) : String(err);
+      
       if (msg.toLowerCase().includes('api key') || msg.includes('403') || msg.includes('not authorized')) {
-        alert('API 키가 올바르지 않거나 권한이 없습니다. 키 설정을 다시 확인해주세요.');
+        alert('API 키 권한 오류 (403): 프로젝트에 API가 활성화되어 있지 않거나 키가 올바르지 않습니다.');
         setShowKeyModal(true);
+      } else if (msg.includes('429') || msg.toLowerCase().includes('quota')) {
+        alert('할당량 초과 (429): 현재 모델의 무료 사용량을 모두 소진했습니다. 잠시 후 다시 시도하거나 다른 API 키를 사용해주세요.');
       } else {
-        alert('분석 중 오류가 발생했습니다: ' + (msg || '알 수 없는 오류'));
+        alert(`오류가 발생했습니다:\n${msg}\n\n상세 정보: ${fullError.substring(0, 100)}...`);
       }
     } finally { setLoading(false); }
   };
@@ -329,7 +333,7 @@ function App() {
                   <h3 className="text-xl font-bold flex items-center gap-3 relative z-10">
                     <Sparkles size={24} /> 🎯 나만의 탐구 전략
                   </h3>
-                  <span className="text-[10px] bg-white/20 backdrop-blur px-3 py-1.5 rounded-full font-bold uppercase tracking-widest relative z-10">Gemini 2.5 Flash</span>
+                  <span className="text-[10px] bg-white/20 backdrop-blur px-3 py-1.5 rounded-full font-bold uppercase tracking-widest relative z-10">Gemini 2.0 Flash</span>
                 </div>
                 <div className="p-8 text-slate-700 leading-relaxed font-medium text-[16px] whitespace-pre-wrap">
                   {result.split('[💡 멘토의 실전 팁]')[0].replace('[🎯 맞춤형 탐구 전략]', '').trim()}
@@ -364,6 +368,19 @@ function App() {
   );
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
-root.render(<App />);
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  // Use a global to hold the root to avoid double-initialization in some environments
+  // @ts-ignore
+  if (!window.__reactRoot) {
+    // @ts-ignore
+    window.__reactRoot = ReactDOM.createRoot(rootElement);
+  }
+  // @ts-ignore
+  window.__reactRoot.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+}
 
