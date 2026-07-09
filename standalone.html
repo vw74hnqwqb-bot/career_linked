@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI 진로 연계 수행평가 컨설턴트 - 고등학생의 수행평가를 전공 적합성에 맞게 설계합니다.">
+    <title>CareerPath Pro | AI 진로 연계 수행평가 컨설턴트</title>
+    
+    <!-- Libraries (CDN) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/framer-motion@11.11.17/dist/framer-motion.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
+        body { 
+            font-family: 'Pretendard', ui-sans-serif, system-ui, sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+            -webkit-font-smoothing: antialiased;
+        }
+        .bento-shadow { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        
+        // Framer Motion Global Mapping
+        const motion = window.Motion?.motion || { 
+            div: (props) => <div {...props}>{props.children}</div>,
+            section: (props) => <section {...props}>{props.children}</section>,
+            h2: (props) => <h2 {...props}>{props.children}</h2>,
+            p: (props) => <p {...props}>{props.children}</p>,
+            footer: (props) => <footer {...props}>{props.children}</footer>,
+            h1: (props) => <h1 {...props}>{props.children}</h1>,
+            form: (props) => <form {...props}>{props.children}</form>,
+            button: (props) => <button {...props}>{props.children}</button>,
+            span: (props) => <span {...props}>{props.children}</span>,
+            ul: (props) => <ul {...props}>{props.children}</ul>,
+            li: (props) => <li {...props}>{props.children}</li>,
+            textarea: (props) => <textarea {...props}>{props.children}</textarea>,
+            h3: (props) => <h3 {...props}>{props.children}</h3>,
+            h4: (props) => <h4 {...props}>{props.children}</h4>,
+            header: (props) => <header {...props}>{props.children}</header>
+        };
+        const AnimatePresence = window.Motion?.AnimatePresence || (({children}) => <>{children}</>);
+
+        // Lucide Icon Helper
+        const Icon = ({ name, size = 20, className = "" }) => {
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [name]);
+            return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
+        };
+
+        const SYSTEM_PROMPT = `
+# 역할 (Role)
+고등학생 진로 연계 수행평가 컨설턴트입니다. 
+융합 공식: [교과 개념] x [진로 도구] = [실천적 산출물]
+
+# 🚫 절대 제약 조건
+1. 1차원적 비유 금지. 실무/학술적 쓰임에 집중. 
+2. 진로 계열에 따라 결과물의 '형태'가 완벽히 달라야 합니다.
+
+# 출력 구조
+[🎯 맞춤형 탐구 전략]
+(탐구 주제, 핵심 도구, 예상 산출물 형태를 상세히 제안하세요.)
+
+[💡 멘토의 실전 팁]
+(심화 탐구 방향과 생기부 기록 포인트를 제언하세요.)
+`;
+
+        async function fetchConsulting(subject, career, apiKey) {
+            const models = ["gemini-3-flash-preview", "gemini-2.5-flash", "gemini-2.0-flash"];
+            let lastError = null;
+
+            for (const model of models) {
+                try {
+                    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contents: [{ parts: [{ text: `시스템 지침: ${SYSTEM_PROMPT}\n입력주제: ${subject}\n진로: ${career}` }] }] })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        let displayName = "Gemini 3 Flash";
+                        if (model === "gemini-2.5-flash") displayName = "Gemini 2.5 Flash";
+                        if (model === "gemini-2.0-flash") displayName = "Gemini 2.0 Flash";
+
+                        return {
+                            text: data.candidates[0].content.parts[0].text,
+                            modelUsed: displayName
+                        };
+                    } else {
+                        const err = await response.json();
+                        lastError = new Error(err.error?.message || `HTTP Error ${response.status}`);
+                    }
+                } catch (e) {
+                    lastError = e;
+                }
+            }
+            throw lastError || new Error("Failed to fetch consulting from all models");
+        }
+
+        // --- Custom Markdown & Math Formatter ---
+        const renderMathText = (math) => {
+            let text = math;
+            const replacements = {
+                '\\theta': 'θ',
+                '\\alpha': 'α',
+                '\\beta': 'β',
+                '\\gamma': 'γ',
+                '\\delta': 'δ',
+                '\\pi': 'π',
+                '\\sigma': 'σ',
+                '\\omega': 'ω',
+                '\\infty': '∞',
+                '\\times': '×',
+                '\\div': '÷',
+                '\\pm': '±',
+                '\\neq': '≠',
+                '\\le': '≤',
+                '\\ge': '≥',
+                '\\approx': '≈',
+                '\\rightarrow': '→',
+                '\\lambda': 'λ',
+                '\\mu': 'μ',
+                '\\phi': 'φ',
+                '\\rho': 'ρ',
+                '\\tau': 'τ',
+                '\\partial': '∂',
+                '\\nabla': '∇',
+                '\\int': '∫',
+                '\\sum': '∑',
+                '\\sqrt': '√',
+                '\\cdot': '·',
+                '\\arctan': 'arctan',
+                '\\sin': 'sin',
+                '\\cos': 'cos',
+                '\\tan': 'tan',
+                '\\log': 'log',
+                '\\ln': 'ln',
+                '\\deg': '°',
+            };
+
+            for (const [key, val] of Object.entries(replacements)) {
+                text = text.replaceAll(key, val);
+            }
+
+            const parts = [];
+            let currentWord = '';
+            
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                if (char === '^') {
+                    if (currentWord) {
+                        parts.push(currentWord);
+                        currentWord = '';
+                    }
+                    let content = '';
+                    if (text[i + 1] === '{') {
+                        let j = i + 2;
+                        let braceCount = 1;
+                        while (j < text.length && braceCount > 0) {
+                            if (text[j] === '{') braceCount++;
+                            else if (text[j] === '}') braceCount--;
+                            if (braceCount > 0) content += text[j];
+                            j++;
+                        }
+                        i = j - 1;
+                    } else {
+                        content = text[i + 1] || '';
+                        i++;
+                    }
+                    parts.push(<sup key={`sup-${i}`} className="text-[10px] leading-none select-none">{content}</sup>);
+                } else if (char === '_') {
+                    if (currentWord) {
+                        parts.push(currentWord);
+                        currentWord = '';
+                    }
+                    let content = '';
+                    if (text[i + 1] === '{') {
+                        let j = i + 2;
+                        let braceCount = 1;
+                        while (j < text.length && braceCount > 0) {
+                            if (text[j] === '{') braceCount++;
+                            else if (text[j] === '}') braceCount--;
+                            if (braceCount > 0) content += text[j];
+                            j++;
+                        }
+                        i = j - 1;
+                    } else {
+                        content = text[i + 1] || '';
+                        i++;
+                    }
+                    parts.push(<sub key={`sub-${i}`} className="text-[10px] leading-none select-none">{content}</sub>);
+                } else {
+                    currentWord += char;
+                }
+            }
+            
+            if (currentWord) {
+                parts.push(currentWord);
+            }
+
+            return <>{parts}</>;
+        };
+
+        const parseInlineText = (text, isDark) => {
+            if (!text) return [];
+            
+            const nodes = [];
+            let currentIndex = 0;
+
+            while (currentIndex < text.length) {
+                const remaining = text.substring(currentIndex);
+                
+                const codeMatch = remaining.match(/`([^`]+)`/);
+                const boldMatch = remaining.match(/\*\*([^*]+)\*\*/);
+                const mathMatch = remaining.match(/\$([^$]+)\$/);
+
+                let firstMatchIndex = Infinity;
+                let matchType = null;
+                let matchedString = '';
+                let innerContent = '';
+
+                if (codeMatch && codeMatch.index !== undefined && codeMatch.index < firstMatchIndex) {
+                    firstMatchIndex = codeMatch.index;
+                    matchType = 'code';
+                    matchedString = codeMatch[0];
+                    innerContent = codeMatch[1];
+                }
+                if (boldMatch && boldMatch.index !== undefined && boldMatch.index < firstMatchIndex) {
+                    firstMatchIndex = boldMatch.index;
+                    matchType = 'bold';
+                    matchedString = boldMatch[0];
+                    innerContent = boldMatch[1];
+                }
+                if (mathMatch && mathMatch.index !== undefined && mathMatch.index < firstMatchIndex) {
+                    firstMatchIndex = mathMatch.index;
+                    matchType = 'math';
+                    matchedString = mathMatch[0];
+                    innerContent = mathMatch[1];
+                }
+
+                if (matchType === null) {
+                    nodes.push(remaining);
+                    break;
+                }
+
+                if (firstMatchIndex > 0) {
+                    nodes.push(remaining.substring(0, firstMatchIndex));
+                }
+
+                const key = `${currentIndex}-${firstMatchIndex}`;
+                if (matchType === 'code') {
+                    nodes.push(
+                        <code key={key} className={isDark ? "font-mono text-[14px] bg-slate-800 text-pink-300 px-1.5 py-0.5 rounded border border-slate-700" : "font-mono text-[14px] bg-slate-100 text-pink-600 px-1.5 py-0.5 rounded border border-slate-200"}>
+                            {innerContent}
+                        </code>
+                    );
+                } else if (matchType === 'bold') {
+                    nodes.push(
+                        <strong key={key} className={isDark ? "font-black text-white bg-white/20 px-1.5 py-0.5 rounded border-b-2 border-indigo-400/50" : "font-extrabold text-slate-900 bg-indigo-50/70 px-1 py-0.5 rounded border-b-2 border-indigo-200/50"}>
+                            {innerContent}
+                        </strong>
+                    );
+                } else if (matchType === 'math') {
+                    const cleanMath = renderMathText(innerContent);
+                    nodes.push(
+                        <span key={key} className={isDark ? "font-serif italic text-indigo-200 font-semibold bg-indigo-950/70 px-1.5 py-0.5 rounded tracking-wide inline-flex items-center gap-0.5 mx-0.5 shadow-sm border border-indigo-800/60" : "font-serif italic text-indigo-700 font-semibold bg-indigo-50/50 px-1.5 py-0.5 rounded tracking-wide inline-flex items-center gap-0.5 mx-0.5 shadow-sm border border-indigo-100/40"}>
+                            {cleanMath}
+                        </span>
+                    );
+                }
+
+                currentIndex += firstMatchIndex + matchedString.length;
+            }
+
+            return nodes;
+        };
+
+        const MarkdownRenderer = ({ text, isDark }) => {
+            if (!text) return null;
+
+            const lines = text.split('\n');
+            const elements = [];
+            
+            let currentListItems = [];
+            let currentListType = null;
+
+            const flushList = (key) => {
+                if (currentListItems.length > 0) {
+                    if (currentListType === 'bullet') {
+                        elements.push(
+                            <ul key={`list-bullet-${key}`} className={`list-disc pl-6 my-4 space-y-2.5 ${isDark ? "text-slate-100" : "text-slate-700"}`}>
+                                {currentListItems}
+                            </ul>
+                        );
+                    } else if (currentListType === 'ordered') {
+                        elements.push(
+                            <ol key={`list-ordered-${key}`} className={`list-decimal pl-6 my-4 space-y-2.5 ${isDark ? "text-slate-100" : "text-slate-700"}`}>
+                                {currentListItems}
+                            </ol>
+                        );
+                    }
+                    currentListItems = [];
+                    currentListType = null;
+                }
+            };
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const trimmed = line.trim();
+
+                if (trimmed.startsWith('### ')) {
+                    flushList(`h3-${i}`);
+                    elements.push(
+                        <h3 key={`h3-${i}`} className={`text-lg font-bold mt-6 mb-3 flex items-center gap-2 border-l-4 pl-3 ${isDark ? "text-white border-indigo-400" : "text-slate-900 border-indigo-500"}`}>
+                            {parseInlineText(trimmed.substring(4), isDark)}
+                        </h3>
+                    );
+                } else if (trimmed.startsWith('## ')) {
+                    flushList(`h2-${i}`);
+                    elements.push(
+                        <h2 key={`h2-${i}`} className={`text-xl font-bold mt-8 mb-4 border-b pb-2 ${isDark ? "text-indigo-200 border-indigo-800/40" : "text-indigo-950 border-indigo-100/50"}`}>
+                            {parseInlineText(trimmed.substring(3), isDark)}
+                        </h2>
+                    );
+                } else if (trimmed.startsWith('# ')) {
+                    flushList(`h1-${i}`);
+                    elements.push(
+                        <h1 key={`h1-${i}`} className={`text-2xl font-black mt-10 mb-5 border-b-2 pb-2 ${isDark ? "text-indigo-100 border-indigo-700/50" : "text-indigo-950 border-indigo-100"}`}>
+                            {parseInlineText(trimmed.substring(2), isDark)}
+                        </h1>
+                    );
+                } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+                    if (currentListType !== 'bullet') {
+                        flushList(`switch-bullet-${i}`);
+                        currentListType = 'bullet';
+                    }
+                    currentListItems.push(
+                        <li key={`li-b-${i}`} className="leading-relaxed pl-1 text-[15px]">
+                            {parseInlineText(trimmed.substring(2), isDark)}
+                        </li>
+                    );
+                } else if (/^\d+\.\s/.test(trimmed)) {
+                    if (currentListType !== 'ordered') {
+                        flushList(`switch-ordered-${i}`);
+                        currentListType = 'ordered';
+                    }
+                    const match = trimmed.match(/^(\d+)\.\s(.*)/);
+                    const content = match ? match[2] : trimmed;
+                    currentListItems.push(
+                        <li key={`li-o-${i}`} className="leading-relaxed pl-1 text-[15px]">
+                            {parseInlineText(content, isDark)}
+                        </li>
+                    );
+                } else if (trimmed.startsWith('> ')) {
+                    flushList(`bq-${i}`);
+                    elements.push(
+                        <blockquote key={`bq-${i}`} className={`border-l-4 pl-4 py-2.5 my-4 rounded-r-2xl italic text-[15px] ${isDark ? "border-indigo-400 bg-slate-800/60 text-slate-200" : "border-indigo-500 bg-indigo-50/40 text-slate-600"}`}>
+                            {parseInlineText(trimmed.substring(2), isDark)}
+                        </blockquote>
+                    );
+                } else if (trimmed === '---' || trimmed === '***') {
+                    flushList(`div-${i}`);
+                    elements.push(<hr key={`hr-${i}`} className={isDark ? "my-6 border-slate-800" : "my-6 border-slate-200"} />);
+                } else if (trimmed === '') {
+                    flushList(`empty-${i}`);
+                } else {
+                    flushList(`para-${i}`);
+                    elements.push(
+                        <p key={`p-${i}`} className={`leading-relaxed text-[15px] mb-4 ${isDark ? "text-white font-medium" : "text-slate-700"}`}>
+                            {parseInlineText(line, isDark)}
+                        </p>
+                    );
+                }
+            }
+
+            flushList('final');
+
+            return <div className="space-y-1">{elements}</div>;
+        };
+
+        function App() {
+            const [subject, setSubject] = useState('');
+            const [career, setCareer] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [result, setResult] = useState(null);
+            const [modelUsed, setModelUsed] = useState('Gemini 3 Flash');
+            const [apiKey, setApiKey] = useState(localStorage.getItem('GS_KEY') || '');
+            const [showKey, setShowKey] = useState(!localStorage.getItem('GS_KEY'));
+            const [tempKey, setTempKey] = useState('');
+
+            const handleAnalyze = async (e) => {
+                e.preventDefault();
+                if (!apiKey) { setShowKey(true); return; }
+                setLoading(true);
+                try {
+                    const res = await fetchConsulting(subject, career, apiKey);
+                    setResult(res.text);
+                    setModelUsed(res.modelUsed);
+                } catch (err) { alert('오류: ' + err.message); if (err.message.includes('API_KEY')) setShowKey(true); }
+                finally { setLoading(false); }
+            };
+
+            const saveKey = (key) => {
+                const trimmed = key.trim();
+                if (trimmed.length < 15) { alert('Invalid API Key format'); return; }
+                localStorage.setItem('GS_KEY', trimmed);
+                setApiKey(trimmed);
+                setShowKey(false);
+            };
+
+            return (
+                <div className="min-h-screen p-4 md:p-8">
+                    <div className="max-w-6xl mx-auto space-y-6">
+                        <header className="flex justify-between items-center bg-white p-6 rounded-3xl bento-shadow border border-slate-200">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg"><Icon name="graduation-cap" size={28} /></div>
+                                <div><h1 className="text-xl font-bold text-slate-900">CareerPath Pro</h1><p className="text-[10px] text-indigo-600 font-bold uppercase tracking-widest leading-none mt-1">Standalone HTML Version</p></div>
+                            </div>
+                            <button onClick={() => setShowKey(true)} className="p-3 hover:bg-slate-100 rounded-2xl transition-colors flex items-center gap-2"><Icon name="key" size={18} className="text-slate-400" /><span className="text-xs font-bold text-slate-500 hidden sm:inline">Settings</span></button>
+                        </header>
+
+                        {showKey && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                                <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full">
+                                    <h3 className="text-xl font-bold mb-2">🔑 API Key Setting</h3>
+                                    <input 
+                                        type="password" 
+                                        placeholder="AIza..." 
+                                        value={tempKey}
+                                        onChange={(e) => setTempKey(e.target.value)}
+                                        className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl mb-4 focus:ring-2 focus:ring-indigo-500/20" 
+                                    />
+                                    <button onClick={() => saveKey(tempKey)} className="w-full h-12 bg-indigo-600 text-white font-bold rounded-xl shadow-lg">저장 및 시작</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {!result ? (
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                                <div className="md:col-span-8 bg-white rounded-3xl p-8 border border-slate-200 bento-shadow flex flex-col justify-between">
+                                    <div>
+                                        <h2 className="text-3xl font-bold text-slate-900 mb-3 leading-tight">수행평가에 <span className="text-indigo-600 underline underline-offset-8 decoration-indigo-100">진로</span>를 더하다.</h2>
+                                        <p className="text-slate-400 text-sm mb-10">평범한 과제를 전공 탐구 보고서로 리패키징하세요.</p>
+                                        <form onSubmit={handleAnalyze} className="space-y-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">과목 및 탐구 주제</label>
+                                                <textarea value={subject} onChange={e => setSubject(e.target.value)} placeholder="예: 생명과학2 - 효소의 활성과 온도 실험" className="w-full h-36 p-5 bg-slate-50 border border-slate-200 rounded-2xl resize-none shadow-inner" required />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">희망 진로</label>
+                                                <input type="text" value={career} onChange={e => setCareer(e.target.value)} placeholder="예: 생명공학 연구원" className="w-full h-12 px-5 bg-slate-50 border border-slate-200 rounded-xl shadow-inner" required />
+                                            </div>
+                                            <button disabled={loading} className="w-full h-14 bg-indigo-600 hover:bg-slate-900 text-white font-bold rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all">
+                                                {loading ? <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" /> : <>탐구 전략 설계하기 <Icon name="arrow-right" /></>}
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                                <div className="md:col-span-4 space-y-6">
+                                    <div className="bg-slate-900 rounded-3xl p-8 text-white shadow-lg relative overflow-hidden">
+                                        <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12"><Icon name="sparkles" size={120} /></div>
+                                        <h3 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-4">Core Model</h3>
+                                        <p className="text-xl font-bold leading-tight relative z-10">교과원리 × 전공도구<br/>= 실천적 산출물</p>
+                                    </div>
+                                    <div className="bg-white rounded-3xl p-6 border border-slate-200 bento-shadow">
+                                        <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 items-center flex gap-2"><div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div> Guide</h3>
+                                        <ul className="text-xs space-y-4 text-slate-600 font-medium">
+                                            {["AI의 제안을 학술 자료로 검증하세요.", "실질적인 실험/논문을 산출물로 연결하세요.", "변화와 성장을 중심으로 기록하세요."].map((s, i) => (
+                                                <li key={i} className="flex gap-4 items-start"><span className="shrink-0 w-6 h-6 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center font-bold text-[10px]">{i+1}</span><span>{s}</span></li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-6 pb-20">
+                                <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden bento-shadow">
+                                    <div className="bg-indigo-600 p-8 text-white font-bold flex justify-between items-center text-xl">
+                                        <div className="flex items-center gap-3"><Icon name="sparkles" /> 🎯 나만의 탐구 전략</div>
+                                        <span className="text-[10px] bg-white/20 px-3 py-1 rounded-full">{modelUsed}</span>
+                                    </div>
+                                    <div className="p-8 text-slate-700 leading-relaxed font-medium text-[16px]">
+                                        <MarkdownRenderer text={result.split('[💡 멘토의 실전 팁]')[0].replace('[🎯 맞춤형 탐구 전략]', '').trim()} />
+                                    </div>
+                                </div>
+                                <div className="bg-slate-900 rounded-3xl p-8 text-white flex flex-col md:flex-row gap-8 items-center shadow-2xl relative">
+                                    <div className="w-16 h-16 bg-indigo-500 rounded-2xl flex items-center justify-center text-3xl shadow-lg shrink-0">💡</div>
+                                    <div className="flex-1 text-center md:text-left">
+                                        <h4 className="text-xl font-bold mb-2 text-indigo-400">멘토의 실전 팁</h4>
+                                        <div className="text-slate-300 text-sm leading-relaxed">
+                                            <MarkdownRenderer text={result.split('[💡 멘토의 실전 팁]')[1]?.trim() || "더 깊은 탐구를 위해 논문 검색을 추천합니다."} isDark={true} />
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setResult(null)} className="px-6 h-12 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors"><Icon name="refresh-ccw" size={14} /> 다시 설계하기</button>
+                                </div>
+                            </div>
+                        )}
+                        <footer className="pt-20 pb-10 border-t border-slate-200 flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                            <p>© 2026 Academic Lab.</p>
+                            <p>Powered by Google AI</p>
+                        </footer>
+                    </div>
+                </div>
+            );
+        }
+        const rootElement = document.getElementById('root');
+        if (rootElement) {
+            // @ts-ignore
+            if (!window.__reactRoot) {
+                // @ts-ignore
+                window.__reactRoot = ReactDOM.createRoot(rootElement);
+            }
+            // @ts-ignore
+            window.__reactRoot.render(<App />);
+        }
+    </script>
+</body>
+</html>
